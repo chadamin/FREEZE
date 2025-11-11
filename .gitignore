@@ -1,0 +1,12 @@
+# 가상환경, 캐시, 로그 등 제외
+.venv/
+__pycache__/
+*.pyc
+*.log
+.env
+.vscode/
+uploads/
+clips/
+labels/
+*.wav
+*.pt
