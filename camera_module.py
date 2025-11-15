@@ -12,8 +12,8 @@ from ultralytics import YOLO
 # =========================
 # 환경변수(없으면 기본값)
 # =========================
-APP_SNAPSHOT_URL = os.getenv("APP_SNAPSHOT_URL", "http://3.105.99.45:8000/api/upload/snapshot")
-APP_VIDEO_URL    = os.getenv("APP_VIDEO_URL",    "http://3.105.99.45:8000/api/upload/video")
+APP_SNAPSHOT_URL = os.getenv("APP_SNAPSHOT_URL", "http://3.37.15.3:8000/api/upload/snapshot")
+APP_VIDEO_URL    = os.getenv("APP_VIDEO_URL",    "http://3.37.15.3:8000/api/upload/video")
 DEVICE_ID        = os.getenv("DEVICE_ID",        "pi-cam-01")
 
 IMG_SIZE     = int(os.getenv("IMG_SIZE", "640"))         # YOLO 입력 크기

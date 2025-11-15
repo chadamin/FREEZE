@@ -351,10 +351,14 @@ async def _broadcast_to_app_hub(payload: dict, topic: Optional[str] = None):
         else:
             payload[k] = _to_plain(v)
 
+    # 🔧 import 경로를 절대 경로 → 패키지 순으로 시도 (환경에 따라 다를 수 있어서)
     try:
-        from .routes.ws_app import app_broadcast_json
+        from routes.ws_app import app_broadcast_json  # FREEZE/app.py 기준
     except Exception:
-        from freeze.routes.ws_app import app_broadcast_json
+        try:
+            from .routes.ws_app import app_broadcast_json  # freeze/runtime.py 기준 패키지
+        except Exception:
+            from freeze.routes.ws_app import app_broadcast_json  # 모듈 이름이 freeze인 경우
 
     try:
         eff_topic = str(topic or payload.get("topic") or WS_TOPIC)
@@ -381,7 +385,8 @@ def _danger_bucket(angle: int, bucket: int = None) -> int:
     if bucket is None:
         bucket = ANGLE_BUCKET_DEG
     try:
-        if angle is None or angle < 0: return -1
+        if angle is None or angle < 0:
+            return -1
         b = int(bucket) if int(bucket) > 0 else 30
         return (int(angle) % 360) // b
     except Exception:
@@ -484,13 +489,17 @@ async def broadcast_info(
         allow_by_cooldown = (now - _last_danger_ts >= DANGER_COOLDOWN_MS)
 
         if allow_by_edge or allow_by_cooldown:
-            clog(f"[VIBRATE] event=danger angle={final_angle} ms={final_ms} key={key} "
-                 f"edge={allow_by_edge} cool={allow_by_cooldown} ids={esp32_list_ids()}")
+            clog(
+                f"[VIBRATE] event=danger angle={final_angle} ms={final_ms} key={key} "
+                f"edge={allow_by_edge} cool={allow_by_cooldown} ids={esp32_list_ids()}"
+            )
             ok = await esp32_vibrate_angle(ms=final_ms, angle_deg=final_angle, strength=strength)
             if not ok:
                 clog("[ESP32] vibrate send failed (not connected?)")
             _last_danger_ts  = now
             _last_danger_key = key
         else:
-            clog(f"[VIBRATE] skipped: cooldown key={key} "
-                 f"dt={now - _last_danger_ts}ms<{DANGER_COOLDOWN_MS}ms")
+            clog(
+                f"[VIBRATE] skipped: cooldown key={key} "
+                f"dt={now - _last_danger_ts}ms<{DANGER_COOLDOWN_MS}ms"
+            )
