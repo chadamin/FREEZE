@@ -20,10 +20,10 @@ DISABLE_DEBOUNCE      = os.getenv("DISABLE_DEBOUNCE", "false").lower() == "true"
 DEFAULT_ESP32_ID      = os.getenv("DEFAULT_ESP32_ID", "esp32-01")
 
 # ✅ 기본은 이벤트 미러링 끔(원하면 1로 켜기)
-MIRROR_EVENTS_TO_ESP  = os.getenv("MIRROR_EVENTS_TO_ESP", "0") in ("1","true","yes")
+MIRROR_EVENTS_TO_ESP  = os.getenv("MIRROR_EVENTS_TO_ESP", "0") in ("1", "true", "yes")
 
 # 🔧 ESP 호환키(direction/deg) 동시 송신 여부(기본 끔)
-ESP_COMPAT_KEYS       = os.getenv("ESP_COMPAT_KEYS", "0") in ("1","true","yes")
+ESP_COMPAT_KEYS       = os.getenv("ESP_COMPAT_KEYS", "0") in ("1", "true", "yes")
 
 AUDIO_SLICE_SEC       = float(os.getenv("AUDIO_SLICE_SEC", "0.5"))
 WHISPER_INTERVAL      = float(os.getenv("WHISPER_INTERVAL", "3.0"))
@@ -44,12 +44,15 @@ ANGLE_FALLBACK        = int(os.getenv("ANGLE_FALLBACK", "0"))  # 0=정면 가정
 
 # 🔒 danger 가드(연속 울림 방지)
 DANGER_COOLDOWN_MS    = int(os.getenv("DANGER_COOLDOWN_MS", "3000"))
-EDGE_TRIGGER_DANGER   = os.getenv("EDGE_TRIGGER_DANGER", "1").lower() in ("1","true","yes")
+EDGE_TRIGGER_DANGER   = os.getenv("EDGE_TRIGGER_DANGER", "1").lower() in ("1", "true", "yes")
 DANGER_MIN_CONF       = float(os.getenv("DANGER_MIN_CONF", "0.0"))
 ANGLE_BUCKET_DEG      = int(os.getenv("ANGLE_BUCKET_DEG", "30"))
 
 # 텐서플로우/야믿넷 로그 억제(선택)
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+
+# 숨길 로그 태그들(쉼표로 여러 개 가능). 기본값: [DEBUG] 만 숨김
+SUPPRESS_LOG_TAGS = [s.strip() for s in os.getenv("SUPPRESS_LOG_TAGS", "[DEBUG]").split(",") if s.strip()]
 
 # ==============================
 # 전역 상태/락
@@ -73,10 +76,6 @@ last_updated_ms: int    = 0
 
 def now_ms() -> int:
     return int(time.time() * 1000)
-
-
-# 숨길 로그 태그들(쉼표로 여러 개 가능). 기본값: [DEBUG] 만 숨김
-SUPPRESS_LOG_TAGS = [s.strip() for s in os.getenv("SUPPRESS_LOG_TAGS", "[DEBUG]").split(",") if s.strip()]
 
 # ==============================
 # 카메라 스트리밍 상태
@@ -114,11 +113,13 @@ def rms_and_dbfs(waveform: np.ndarray) -> Tuple[float, float]:
 def wrap_pcm16_to_wav(pcm_bytes: bytes, sr: int, channels: int = 1) -> bytes:
     buf = io.BytesIO()
     with wave.open(buf, "wb") as wf:
-        wf.setnchannels(channels); wf.setsampwidth(2); wf.setframerate(sr)
+        wf.setnchannels(channels)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
         wf.writeframes(pcm_bytes)
     return buf.getvalue()
 
-BIN_MAGIC = b'AIOD'
+BIN_MAGIC = b"AIOD"
 BIN_HEADER_FMT = "<4s I I h B B"
 BIN_HEADER_SIZE = struct.calcsize(BIN_HEADER_FMT)
 
@@ -161,7 +162,8 @@ def decode_from_canonical_payload(data: dict):
     if isinstance(data.get("audio_b64"), str) and data["audio_b64"]:
         wav = base64.b64decode(_b64fix(data["audio_b64"]), validate=False)
         with wave.open(io.BytesIO(wav), "rb") as wf:
-            sr = wf.getframerate(); ch = wf.getnchannels()
+            sr = wf.getframerate()
+            ch = wf.getnchannels()
             frames = wf.readframes(wf.getnframes())
         audio = np.frombuffer(frames, dtype=np.int16)
         if ch > 1 and audio.size > 0:
@@ -186,13 +188,13 @@ def vad_is_speech_int16(pcm: bytes, sr: int) -> bool:
     if not USE_WEBRTCVAD or _vad is None or sr != 16000:
         return True
     frame_ms = 20
-    frame_bytes = int(sr * (frame_ms/1000.0)) * 2
+    frame_bytes = int(sr * (frame_ms / 1000.0)) * 2
     if len(pcm) < frame_bytes:
         return False
     speech_frames = 0
     total = 0
     for i in range(0, len(pcm) - frame_bytes + 1, frame_bytes):
-        chunk = pcm[i:i+frame_bytes]
+        chunk = pcm[i : i + frame_bytes]
         if _vad.is_speech(chunk, sr):
             speech_frames += 1
         total += 1
@@ -206,13 +208,16 @@ class WhisperAccumulator:
         self.buf = bytearray()
         self.sr = None
         self.sec = 0.0
+
     def add(self, wf: np.ndarray, sr: int):
         if self.sr is None:
             self.sr = sr
         self.buf.extend(wf.astype(np.int16).tobytes())
         self.sec += AUDIO_SLICE_SEC
+
     def ready(self) -> bool:
         return self.sec >= WHISPER_INTERVAL
+
     def flush_wav(self) -> bytes:
         if self.sr is None or not self.buf:
             return b""
@@ -224,11 +229,16 @@ class WhisperAccumulator:
         self.sec = OVERLAP_SEC
         return wav
 
-def gate_is_speech(dbfs: float, raw_label: str, raw_conf: float,
-                   group_label: str, group_conf: float) -> bool:
-    level_ok = (dbfs >= DBFS_GATE)
-    by_raw   = raw_label.lower().startswith("speech") and (raw_conf  >= SPEECH_RAW_GATE_CONF)
-    by_group = (group_label in ("Shout","Speech")) and (group_conf >= SPEECH_GATE_CONF)
+def gate_is_speech(
+    dbfs: float,
+    raw_label: str,
+    raw_conf: float,
+    group_label: str,
+    group_conf: float,
+) -> bool:
+    level_ok = dbfs >= DBFS_GATE
+    by_raw   = raw_label.lower().startswith("speech") and (raw_conf >= SPEECH_RAW_GATE_CONF)
+    by_group = (group_label in ("Shout", "Speech")) and (group_conf >= SPEECH_GATE_CONF)
     return level_ok and (by_raw or by_group)
 
 # ==============================
@@ -242,7 +252,6 @@ def clog(*args, **kwargs):
             if tag and first.startswith(tag):
                 return
     print(*args, flush=True, **kwargs)
-
 
 def clog_exc(prefix: str = "[EXC]"):
     print(prefix, flush=True)
@@ -318,10 +327,12 @@ def _norm_angle_for_esp(angle_deg: Optional[int]) -> int:
     except Exception:
         return ANGLE_FALLBACK % 360
 
-async def esp32_vibrate_angle(ms: Optional[int] = None,
-                              angle_deg: Optional[int] = None,
-                              strength: int = 100,
-                              esp_id: Optional[str] = None) -> bool:
+async def esp32_vibrate_angle(
+    ms: Optional[int] = None,
+    angle_deg: Optional[int] = None,
+    strength: int = 100,
+    esp_id: Optional[str] = None,
+) -> bool:
     global _last_vibrate_ts
     now = now_ms()
     if not DISABLE_DEBOUNCE and (now - _last_vibrate_ts < VIBRATE_DEBOUNCE_MS):
@@ -333,8 +344,32 @@ async def esp32_vibrate_angle(ms: Optional[int] = None,
     _angle = _norm_angle_for_esp(angle_deg)
     payload = {"t": "vibrate", "ms": _ms, "angle": _angle, "strength": int(strength)}
     if ESP_COMPAT_KEYS:
-        payload.update({"direction": _angle, "deg": _angle})  # ← 필요 시만 켜기
+        payload.update({"direction": _angle, "deg": _angle})
     clog(f"[ESP->] vibrate angle={_angle} ms={_ms} ids={esp32_list_ids()}")
+    return await esp32_send_json(payload, esp_id=esp_id)
+
+async def esp32_send_minimal_event(
+    event: str,
+    angle_deg: int,
+    ms: int,
+    esp_id: Optional[str] = None,
+) -> bool:
+    """
+    예전 HTTP /notify 스타일의 최소 JSON:
+    {"t": "danger"|"info", "dir": <angle>, "ms": <ms>, "dang": <bool>}
+    """
+    _angle = _norm_angle_for_esp(angle_deg)
+    payload = {
+        "t": event,
+        "dir": int(_angle),
+        "ms": int(ms),
+        "dang": bool(event == "danger" and ms > 0),
+    }
+    if ESP_COMPAT_KEYS:
+        payload["angle"] = payload["dir"]
+        payload["direction"] = payload["dir"]
+
+    clog(f"[ESP->] min event={event} angle={_angle} ms={ms} ids={esp32_list_ids()}")
     return await esp32_send_json(payload, esp_id=esp_id)
 
 # ==============================
@@ -353,12 +388,12 @@ async def _broadcast_to_app_hub(payload: dict, topic: Optional[str] = None):
 
     # 🔧 import 경로를 절대 경로 → 패키지 순으로 시도 (환경에 따라 다를 수 있어서)
     try:
-        from routes.ws_app import app_broadcast_json  # FREEZE/app.py 기준
+        from routes.routes_ws import app_broadcast_json  # FREEZE/app.py 기준
     except Exception:
         try:
-            from .routes.ws_app import app_broadcast_json  # freeze/runtime.py 기준 패키지
+            from .routes.routes_ws import app_broadcast_json  # freeze/runtime.py 기준 패키지
         except Exception:
-            from freeze.routes.ws_app import app_broadcast_json  # 모듈 이름이 freeze인 경우
+            from freeze.routes.routes_ws import app_broadcast_json  # 모듈 이름이 freeze인 경우
 
     try:
         eff_topic = str(topic or payload.get("topic") or WS_TOPIC)
@@ -410,7 +445,6 @@ async def broadcast_info(
     strength: int = 100,
     topic: Optional[str] = None,
 ):
-    # ★ 전역 상태는 함수 시작부에서 한 번에 선언 (읽기/쓰기 모두 커버)
     global _last_danger_ts, _last_danger_key
 
     # ---- 방향 보정 ----
@@ -442,7 +476,7 @@ async def broadcast_info(
         "label": group_label,
         "confidence": conf_val,
         "dbfs": float(dbfs),
-        "ms": int(ms or 0),                   # 대시보드 표시용
+        "ms": int(ms or 0),
         "angle": int(ang if ang is not None else -1),
         "strength": int(strength),
     }
@@ -493,9 +527,26 @@ async def broadcast_info(
                 f"[VIBRATE] event=danger angle={final_angle} ms={final_ms} key={key} "
                 f"edge={allow_by_edge} cool={allow_by_cooldown} ids={esp32_list_ids()}"
             )
-            ok = await esp32_vibrate_angle(ms=final_ms, angle_deg=final_angle, strength=strength)
+
+            # 1) 새 방식: t="vibrate" 패킷
+            ok = await esp32_vibrate_angle(
+                ms=final_ms,
+                angle_deg=final_angle,
+                strength=strength,
+            )
             if not ok:
                 clog("[ESP32] vibrate send failed (not connected?)")
+
+            # 2) 옛날 방식 호환: t="danger" 최소 JSON도 같이 전송
+            try:
+                await esp32_send_minimal_event(
+                    event="danger",
+                    angle_deg=final_angle,
+                    ms=final_ms,
+                )
+            except Exception as e:
+                clog("[ESP32] min danger send error", e)
+
             _last_danger_ts  = now
             _last_danger_key = key
         else:

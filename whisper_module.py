@@ -25,7 +25,7 @@ import torch
 from faster_whisper import WhisperModel
 
 # ========= Config (env-overridable) =========
-MODEL_NAME       = os.getenv("WHISPER_MODEL", "large")       # 최종 전사용
+MODEL_NAME       = os.getenv("WHISPER_MODEL", "small")       # 최종 전사용
 FAST_MODEL_NAME  = os.getenv("WHISPER_FAST_MODEL", "small")   # 부분 전사용(저지연)
 # faster-whisper 연산 타입 (CPU: int8_float16 권장 / GPU: float16 권장)
 COMPUTE_TYPE     = os.getenv("WHISPER_COMPUTE", "int8_float16")
