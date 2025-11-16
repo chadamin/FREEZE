@@ -5,8 +5,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routes.routes_ws import router as ws_router
-from routes.routes_http import router as http_router
+from routes import router
 
 # .env 로드
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
@@ -23,5 +22,4 @@ app.add_middleware(
 )
 
 # 라우터 등록
-app.include_router(ws_router)
-app.include_router(http_router)
+app.include_router(router)

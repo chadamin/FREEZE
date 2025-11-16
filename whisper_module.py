@@ -1,10 +1,4 @@
 # whisper_module.py
-# ------------------------------------------------------------
-# Real-time partials + one-shot final:
-# - Quiet chunks ignored by VAD
-# - On trigger, stream partial transcripts every ~0.5s
-# - After ~3s window, emit one final segment
-# ------------------------------------------------------------
 
 import asyncio
 import io
